@@ -1,0 +1,86 @@
+groups:
+  - name: voicescribe_critical_alerts
+    interval: 15s
+    rules:
+      - alert: GPUServiceUnreachable
+        expr: up{job=~"voicescribe_svc06_transcription_engine|voicescribe_svc07_diarization_engine"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Servizio GPU non raggiungibile"
+          description: "Uno dei servizi GPU (SVC-06/SVC-07) non risponde da oltre 1 minuto."
+          runbook_url: "https://github.com/voicescribe/voicescribe-infra/blob/main/docs/OPERATIONS.md#worker-gpu-non-risponde"
+
+      - alert: CeleryQueueBacklogHigh
+        expr: sum(celery_queue_depth{queue=~"cpu_tasks|gpu_tasks|export_tasks"}) > 100
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Coda Celery oltre 100 job"
+          description: "La profondita totale delle code Celery supera 100 job in attesa."
+          runbook_url: "https://github.com/voicescribe/voicescribe-infra/blob/main/docs/OPERATIONS.md#stato-code-celery"
+
+      - alert: RamdiskUsageHigh
+        expr: (node_filesystem_avail_bytes{mountpoint="/mnt/ramdisk"} / node_filesystem_size_bytes{mountpoint="/mnt/ramdisk"}) < 0.20
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Ramdisk sopra 80%"
+          description: "Lo spazio libero del ramdisk e sotto il 20%."
+          runbook_url: "https://github.com/voicescribe/voicescribe-infra/blob/main/docs/OPERATIONS.md#ramdisk-pieno"
+
+      - alert: InferenceLatencyHigh
+        expr: avg_over_time(voicescribe_inference_latency_seconds[5m]) > 120
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Latenza media inference > 120s"
+          description: "La latenza media di inference GPU supera i 120 secondi negli ultimi 5 minuti."
+          runbook_url: "https://github.com/voicescribe/voicescribe-infra/blob/main/docs/OPERATIONS.md#diagnosi-performance-gpu"
+
+      - alert: Error5xxRateHigh
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[1m])) /
+          clamp_min(sum(rate(http_requests_total[1m])), 1)
+          > 0.05
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Tasso errori 5xx superiore al 5%"
+          description: "Il rapporto tra risposte 5xx e richieste totali supera il 5% nell'ultimo minuto."
+          runbook_url: "https://github.com/voicescribe/voicescribe-infra/blob/main/docs/OPERATIONS.md#job-bloccato"
+
+      - alert: GPUWorkerNoJob2h
+        expr: increase(voicescribe_transcriptions_completed_total[2h]) == 0 or absent(voicescribe_transcriptions_completed_total)
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "GPU worker senza job completati nelle ultime 2 ore"
+          description: "Nessun job di trascrizione completato da oltre 2 ore."
+          runbook_url: "https://github.com/voicescribe/voicescribe-infra/blob/main/docs/OPERATIONS.md#worker-gpu-non-risponde"
+
+      - alert: FailedJobsHigh24h
+        expr: increase(voicescribe_jobs_total{status="FAILED"}[24h]) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Oltre 10 job FAILED nelle ultime 24 ore"
+          description: "Numero di job falliti superiore a 10 nelle ultime 24 ore."
+          runbook_url: "https://github.com/voicescribe/voicescribe-infra/blob/main/docs/OPERATIONS.md#job-bloccato"
+
+      - alert: QuotaRedisPostgresInconsistent
+        expr: abs(voicescribe_quota_redis_count - voicescribe_quota_postgres_count) > 5
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Inconsistenza contatori quota Redis vs PostgreSQL"
+          description: "Differenza tra contatori quota in Redis e record PostgreSQL superiore a 5."
+          runbook_url: "https://github.com/voicescribe/voicescribe-infra/blob/main/docs/OPERATIONS.md#contatori-redis-e-postgresql-inconsistenti"

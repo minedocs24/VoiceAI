@@ -1,0 +1,118 @@
+-- Shared schema initialized at first container bootstrap.
+
+DO $$ BEGIN
+  CREATE TYPE tier_at_creation AS ENUM ('FREE', 'PRO', 'ENTERPRISE');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE job_status AS ENUM ('QUEUED', 'PREPROCESSING', 'TRANSCRIBING', 'DIARIZING', 'EXPORTING', 'DONE', 'FAILED');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+
+CREATE TABLE IF NOT EXISTS tenants (
+  id VARCHAR(64) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  tier tier_at_creation NOT NULL DEFAULT 'FREE',
+  api_key_hash VARCHAR(128),
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+COMMENT ON TABLE tenants IS 'Anagrafica tenant e piano corrente';
+COMMENT ON COLUMN tenants.id IS 'Identificativo tenant univoco';
+COMMENT ON COLUMN tenants.name IS 'Nome tenant';
+COMMENT ON COLUMN tenants.tier IS 'Tier tenant';
+COMMENT ON COLUMN tenants.api_key_hash IS 'Hash API key SHA-256';
+COMMENT ON COLUMN tenants.is_active IS 'Tenant attivo';
+COMMENT ON COLUMN tenants.created_at IS 'Creazione tenant UTC';
+COMMENT ON COLUMN tenants.updated_at IS 'Ultimo update tenant UTC';
+
+CREATE TABLE IF NOT EXISTS jobs (
+  id UUID PRIMARY KEY,
+  tenant_id VARCHAR(64) NOT NULL REFERENCES tenants(id) ON UPDATE CASCADE ON DELETE RESTRICT,
+  tier_at_creation tier_at_creation NOT NULL,
+  status job_status NOT NULL,
+  priority SMALLINT NOT NULL CHECK (priority IN (1,5,10)),
+  duration_seconds DOUBLE PRECISION,
+  ramdisk_path VARCHAR(512),
+  transcription_raw JSONB,
+  diarization_raw JSONB,
+  gpu_inference_ms INTEGER CHECK (gpu_inference_ms IS NULL OR gpu_inference_ms >= 0),
+  celery_task_id VARCHAR(64),
+  error_code VARCHAR(64),
+  error_message TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  completed_at TIMESTAMPTZ,
+  status_history JSONB DEFAULT '[]'::jsonb
+);
+
+COMMENT ON TABLE jobs IS 'Stato pipeline job';
+COMMENT ON COLUMN jobs.status_history IS 'History of status transitions';
+COMMENT ON COLUMN jobs.id IS 'UUID del job';
+COMMENT ON COLUMN jobs.tenant_id IS 'FK tenant';
+COMMENT ON COLUMN jobs.tier_at_creation IS 'Tier al momento della creazione';
+COMMENT ON COLUMN jobs.status IS 'Stato del job';
+COMMENT ON COLUMN jobs.priority IS 'Priorita coda Celery';
+COMMENT ON COLUMN jobs.duration_seconds IS 'Durata media file audio in secondi';
+COMMENT ON COLUMN jobs.ramdisk_path IS 'Path temporaneo su ramdisk';
+COMMENT ON COLUMN jobs.transcription_raw IS 'JSON output SVC-06';
+COMMENT ON COLUMN jobs.diarization_raw IS 'JSON output SVC-07';
+COMMENT ON COLUMN jobs.gpu_inference_ms IS 'Latenza inference GPU';
+COMMENT ON COLUMN jobs.celery_task_id IS 'Task Celery id';
+COMMENT ON COLUMN jobs.error_code IS 'Codice errore standard';
+COMMENT ON COLUMN jobs.error_message IS 'Messaggio errore';
+COMMENT ON COLUMN jobs.created_at IS 'Creazione job UTC';
+COMMENT ON COLUMN jobs.updated_at IS 'Ultimo update job UTC';
+COMMENT ON COLUMN jobs.completed_at IS 'Completamento job UTC';
+
+CREATE INDEX IF NOT EXISTS idx_jobs_tenant_id ON jobs(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
+CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_jobs_tenant_status ON jobs(tenant_id, status);
+
+CREATE TABLE IF NOT EXISTS free_tier_usage (
+  tenant_id VARCHAR(64) NOT NULL REFERENCES tenants(id) ON UPDATE CASCADE ON DELETE CASCADE,
+  usage_date DATE NOT NULL,
+  used_count INTEGER NOT NULL DEFAULT 0 CHECK (used_count >= 0),
+  quota_exceeded_attempts INTEGER NOT NULL DEFAULT 0 CHECK (quota_exceeded_attempts >= 0),
+  reset_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (tenant_id, usage_date)
+);
+
+COMMENT ON TABLE free_tier_usage IS 'Consumo quota free giornaliero';
+COMMENT ON COLUMN free_tier_usage.tenant_id IS 'Tenant id';
+COMMENT ON COLUMN free_tier_usage.usage_date IS 'Data UTC';
+COMMENT ON COLUMN free_tier_usage.used_count IS 'Trascrizioni consumate';
+COMMENT ON COLUMN free_tier_usage.quota_exceeded_attempts IS 'Tentativi oltre quota';
+COMMENT ON COLUMN free_tier_usage.reset_at IS 'Timestamp reset quota';
+COMMENT ON COLUMN free_tier_usage.created_at IS 'Creazione record';
+COMMENT ON COLUMN free_tier_usage.updated_at IS 'Ultimo update record';
+
+CREATE INDEX IF NOT EXISTS idx_free_tier_usage_date ON free_tier_usage(usage_date DESC);
+CREATE INDEX IF NOT EXISTS idx_free_tier_usage_exceeded ON free_tier_usage(quota_exceeded_attempts DESC);
+
+CREATE OR REPLACE FUNCTION set_updated_at_timestamp() RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_tenants_updated_at ON tenants;
+CREATE TRIGGER trg_tenants_updated_at BEFORE UPDATE ON tenants
+FOR EACH ROW EXECUTE FUNCTION set_updated_at_timestamp();
+
+DROP TRIGGER IF EXISTS trg_jobs_updated_at ON jobs;
+CREATE TRIGGER trg_jobs_updated_at BEFORE UPDATE ON jobs
+FOR EACH ROW EXECUTE FUNCTION set_updated_at_timestamp();
+
+DROP TRIGGER IF EXISTS trg_free_tier_usage_updated_at ON free_tier_usage;
+CREATE TRIGGER trg_free_tier_usage_updated_at BEFORE UPDATE ON free_tier_usage
+FOR EACH ROW EXECUTE FUNCTION set_updated_at_timestamp();

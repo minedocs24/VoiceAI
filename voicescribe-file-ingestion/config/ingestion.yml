@@ -1,0 +1,40 @@
+formats:
+  mp3:
+    magic_bytes:
+      - "49 44 33"   # ID3
+      - "FF FB"
+      - "FF F3"
+      - "FF F2"
+  mp4:
+    magic_bytes:
+      - "00 00 00 ?? 66 74 79 70"
+  wav:
+    magic_bytes:
+      - "52 49 46 46"
+  m4a:
+    magic_bytes:
+      - "00 00 00 ?? 66 74 79 70 4D 34 41"
+      - "00 00 00 ?? 66 74 79 70 69 73 6F"
+  ogg:
+    magic_bytes:
+      - "4F 67 67 53"
+  flac:
+    magic_bytes:
+      - "66 4C 61 43"
+  webm:
+    magic_bytes:
+      - "1A 45 DF A3"
+  mkv:
+    magic_bytes:
+      - "1A 45 DF A3"
+
+magic_buffer_size: 64
+upload_chunk_size: 262144
+probe_timeout_seconds: 30
+probe_cache_ttl_seconds: 3600
+free_tier_max_duration_seconds: 1800
+temp_file_max_age_seconds: 3600
+temp_cleanup_interval_seconds: 900
+
+storage:
+  path_pattern: "{base}/{tenant_id}/{job_id}/{uuid}.{ext}"

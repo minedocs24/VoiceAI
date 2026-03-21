@@ -1,0 +1,202 @@
+openapi: 3.1.0
+info:
+  title: Diarization Engine API
+  version: 0.1.0
+  x-reusable: true
+  description: |
+    Standalone speaker diarization service based on Pyannote.
+    Answers "who spoke when?" by assigning speaker labels to time segments (and optionally
+    to existing transcript segments). Can be used with any transcription source (e.g. Whisper,
+    SVC-06) or for diarization-only workflows (meeting recorders, call center QA, legal transcription).
+
+    Integration: typically receives pre-processed audio and transcript from an upstream pipeline;
+    outputs the same transcript enriched with speaker labels per segment.
+
+servers:
+  - url: http://localhost:8006
+    description: Local development
+
+paths:
+  /diarize:
+    post:
+      summary: Diarize audio (with optional transcript merge)
+      description: |
+        Runs speaker diarization on the audio file at input_path.
+        If `segments` is provided in the body, the service aligns the speaker timeline to those
+        transcript segments (merge) and returns a DiarizationResult with speaker per segment.
+        If `segments` is omitted, only the speaker timeline is produced (no transcript to align);
+        this allows reusing the service for diarization-only use cases without a transcription step.
+      security:
+        - InternalToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiarizeRequest'
+      responses:
+        '200':
+          description: Diarization completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiarizationResult'
+        '503':
+          description: Service unavailable (model not loaded, HuggingFace token invalid)
+        '404':
+          description: Audio file not found
+
+  /models/status:
+    get:
+      summary: Model and readiness status
+      description: |
+        Returns whether the Pyannote model is loaded, if the HuggingFace token is valid
+        (without exposing it), VRAM used, and last load time. Use to check if the service
+        is ready to handle /diarize requests.
+      responses:
+        '200':
+          description: Status payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelStatusResponse'
+
+  /health:
+    get:
+      summary: Health check
+      operationId: svc07_health
+      responses:
+        '200':
+          description: Healthy
+        '503':
+          description: Unhealthy (e.g. model not loaded)
+
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      operationId: svc07_metrics
+      responses:
+        '200':
+          description: Prometheus text format
+
+components:
+  securitySchemes:
+    InternalToken:
+      type: apiKey
+      in: header
+      name: X-Internal-Token
+
+  schemas:
+    DiarizeRequest:
+      type: object
+      required: [job_id, input_path]
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        input_path:
+          type: string
+          description: Path to pre-processed audio file
+        segments:
+          type: array
+          nullable: true
+          description: Optional transcript segments (start, end, text, ...). If omitted, only speaker timeline is returned.
+          items:
+            type: object
+        language:
+          type: string
+          default: unknown
+        duration:
+          type: number
+          minimum: 0
+          default: 0
+        num_speakers:
+          type: integer
+          nullable: true
+        min_speakers:
+          type: integer
+          nullable: true
+        max_speakers:
+          type: integer
+          nullable: true
+
+    TranscriptWord:
+      type: object
+      properties:
+        word:
+          type: string
+        start:
+          type: number
+        end:
+          type: number
+        probability:
+          type: number
+
+    TranscriptSegment:
+      type: object
+      properties:
+        start:
+          type: number
+        end:
+          type: number
+        text:
+          type: string
+        confidence:
+          type: number
+        words:
+          type: array
+          items:
+            $ref: '#/components/schemas/TranscriptWord'
+        speaker:
+          type: string
+          nullable: true
+          description: Speaker label (e.g. SPEAKER_00) or null if no overlap with diarization
+
+    SpeakerStats:
+      type: object
+      properties:
+        speaker:
+          type: string
+        utterance_count:
+          type: integer
+          minimum: 0
+
+    DiarizationResult:
+      type: object
+      description: TranscriptResult (SVC-06) extended with speaker per segment and speakers list
+      required: [job_id, language, duration, rtf, inference_ms, segments]
+      properties:
+        job_id:
+          type: string
+        language:
+          type: string
+        duration:
+          type: number
+        rtf:
+          type: number
+        inference_ms:
+          type: integer
+        segments:
+          type: array
+          items:
+            $ref: '#/components/schemas/TranscriptSegment'
+        speakers:
+          type: array
+          items:
+            $ref: '#/components/schemas/SpeakerStats'
+
+    ModelStatusResponse:
+      type: object
+      properties:
+        model_loaded:
+          type: boolean
+        hf_token_valid:
+          type: boolean
+        vram_used_mb:
+          type: number
+        load_seconds:
+          type: number
+        model_name:
+          type: string
+        service_ready:
+          type: boolean

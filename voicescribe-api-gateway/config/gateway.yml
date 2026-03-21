@@ -1,0 +1,44 @@
+# VoiceScribe API Gateway configuration
+
+rate_limit:
+  free_tier_rpm: 10
+  pro_tier_rpm: 100
+  enterprise_tier_rpm: 500  # configurable per tenant
+  auth_failure_max_attempts: 5
+  auth_failure_window_minutes: 15
+  auth_failure_block_minutes: 30
+
+auth_excluded_paths:
+  - /health
+  - /metrics
+  - /docs
+  - /openapi.json
+  - /redoc
+  - /api-docs
+
+upstream_timeouts:
+  probe_seconds: 30
+  quota_seconds: 10
+  upload_seconds: 120
+
+cors:
+  origins: []
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+  headers: ["Authorization", "X-API-Key", "Content-Type", "X-Request-Id"]
+
+tier_features:
+  free:
+    duration_max_seconds: 1800
+    export_formats: ["txt", "srt", "json"]
+    diarization_enabled: false
+    file_max_bytes: 2147483648
+  pro:
+    duration_max_seconds: 14400
+    export_formats: ["txt", "srt", "json", "docx", "vtt"]
+    diarization_enabled: true
+    file_max_bytes: 2147483648
+  enterprise:
+    duration_max_seconds: 86400
+    export_formats: ["txt", "srt", "json", "docx", "vtt"]
+    diarization_enabled: true
+    file_max_bytes: 2147483648

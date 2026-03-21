@@ -1,0 +1,15 @@
+model:
+  download_dir: /models/whisper
+inference:
+  temperature: 0.0
+  condition_on_previous_text: false
+  word_timestamps: true
+vad:
+  threshold: 0.5
+  min_silence_duration_ms: 400
+auto_split:
+  threshold_minutes: 90
+  chunk_length_s: 1800
+  stride_length_s: 10
+timeouts:
+  max_inference_seconds: 1800

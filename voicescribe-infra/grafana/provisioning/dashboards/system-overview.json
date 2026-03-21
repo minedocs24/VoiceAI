@@ -1,0 +1,81 @@
+{
+  "uid": "voicescribe-system",
+  "title": "VoiceScribe - System Overview",
+  "schemaVersion": 39,
+  "version": 2,
+  "refresh": "15s",
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Services Status (up=1)",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "up{job=~'voicescribe.*'}", "refId": "A", "legendFormat": "{{job}}"}],
+      "gridPos": {"h": 4, "w": 24, "x": 0, "y": 0}
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Throughput (jobs/hour)",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "sum(rate(voicescribe_jobs_completed_total[1h])) * 3600", "refId": "A"}],
+      "gridPos": {"h": 6, "w": 12, "x": 0, "y": 4}
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "End-to-End Latency (s)",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "histogram_quantile(0.95, sum(rate(voicescribe_job_duration_seconds_bucket[5m])) by (le))", "refId": "A"}],
+      "gridPos": {"h": 6, "w": 12, "x": 12, "y": 4}
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Celery Queue Depth",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "sum by(queue)(celery_queue_depth)", "refId": "A"}],
+      "gridPos": {"h": 6, "w": 12, "x": 0, "y": 10}
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Error Rate by Service",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "sum by(job)(rate(http_requests_total{status=~'5..'}[5m]))", "refId": "A"}],
+      "gridPos": {"h": 6, "w": 12, "x": 12, "y": 10}
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Free Tier Quota (24h)",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "sum by(tenant_id)(voicescribe_free_tier_used_count)", "refId": "A"}],
+      "gridPos": {"h": 6, "w": 12, "x": 0, "y": 16}
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Webhook Failures (1h)",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "increase(voicescribe_webhook_failures_total[1h])", "refId": "A"}],
+      "gridPos": {"h": 6, "w": 12, "x": 12, "y": 16}
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "CPU Usage (%)",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "100 - (avg by(instance)(irate(node_cpu_seconds_total{mode='idle'}[5m])) * 100)", "refId": "A"}],
+      "gridPos": {"h": 6, "w": 12, "x": 0, "y": 22}
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Memory Usage (%)",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100", "refId": "A"}],
+      "gridPos": {"h": 6, "w": 12, "x": 12, "y": 22}
+    }
+  ]
+}

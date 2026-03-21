@@ -1,0 +1,16 @@
+FROM python:3.11-slim
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends     ffmpeg ca-certificates &&     rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY pyproject.toml README.md ./
+COPY app ./app
+COPY config ./config
+COPY openapi.yaml ./openapi.yaml
+COPY run.py ./run.py
+
+RUN pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir .
+
+EXPOSE 8005
+CMD ["python", "run.py"]

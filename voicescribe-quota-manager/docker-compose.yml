@@ -1,0 +1,48 @@
+# Standalone docker-compose for Quota Manager (dev and test)
+services:
+  redis:
+    image: redis:7-alpine
+    command: redis-server
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: voicescribe
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/01-init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  quota-manager:
+    build: .
+    ports:
+      - "8002:8002"
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 2
+      REDIS_PASSWORD: ""
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/voicescribe
+      VOICESCRIBE_DB_NAME: voicescribe
+      PORT: 8002
+      INTERNAL_SERVICE_TOKEN: dev-internal-token
+      FREE_TIER_DAILY_LIMIT: 2
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy

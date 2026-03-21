@@ -1,0 +1,39 @@
+# Configurazione Export Service
+
+docx:
+  header:
+    title: "Trascrizione"
+    subtitle_template: "Progetto: {project_name}"
+    metadata_fields:
+      - label: "Data"
+        key: "date"
+      - label: "Durata audio"
+        key: "duration"
+      - label: "Modello"
+        key: "model"
+  typography:
+    font_family: "Calibri"
+    font_size_pt: 11
+    speaker_colors:
+      - "#2E75B6"   # Blu
+      - "#C55A11"   # Arancione
+      - "#70AD47"   # Verde
+      - "#5B9BD5"   # Azzurro
+      - "#FFC000"   # Giallo
+      - "#7030A0"   # Viola
+  toc_min_pages: 10
+  footer:
+    page_number: true
+    export_date: true
+
+srt:
+  max_chars_per_line: 80
+  max_duration_seconds: 3.0
+
+output:
+  structure: "{base}/{tenant_id}/{job_id}"
+  filenames:
+    txt: "transcript.txt"
+    srt: "transcript.srt"
+    json: "transcript.json"
+    docx: "transcript.docx"

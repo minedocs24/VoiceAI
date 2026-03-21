@@ -1,0 +1,78 @@
+services:
+  svc01_api_gateway:
+    host: voicescribe-api-gateway
+    port: 8000
+  svc02_file_ingestion:
+    host: voicescribe-file-ingestion
+    port: 8001
+  svc03_quota_manager:
+    host: voicescribe-quota-manager
+    port: 8002
+  svc04_audio_preprocessor:
+    host: voicescribe-audio-preprocessor
+    port: 8003
+  svc05_job_orchestrator:
+    host: voicescribe-job-orchestrator
+    port: 8004
+  svc06_transcription_engine:
+    host: voicescribe-transcription-engine
+    port: 8005
+  svc07_diarization_engine:
+    host: voicescribe-diarization-engine
+    port: 8006
+  svc08_export_service:
+    host: voicescribe-export-service
+    port: 8007
+
+network:
+  connect_timeout_seconds: 5
+  read_timeout_seconds: 120
+  retries: 3
+
+celery:
+  broker_url: redis://:${REDIS_PASSWORD}@redis:6379/0
+  result_backend: redis://:${REDIS_PASSWORD}@redis:6379/1
+  queues:
+    cpu_tasks:
+      priority:
+        free: 1
+        pro: 5
+        enterprise: 10
+      max_retries: 3
+      retry_backoff_seconds: 30
+    gpu_tasks:
+      priority:
+        free: 1
+        pro: 5
+        enterprise: 10
+      max_retries: 2
+      retry_backoff_seconds: 45
+    export_tasks:
+      priority:
+        free: 1
+        pro: 5
+        enterprise: 10
+      max_retries: 3
+      retry_backoff_seconds: 20
+
+redis:
+  ttl:
+    free_quota_daily_seconds: 86400
+    tenant_cache_seconds: 3600
+    job_status_channel_seconds: 7200
+
+limits:
+  upload_max_bytes:
+    free: 2147483648
+    pro: 2147483648
+    enterprise: 2147483648
+  duration_max_seconds:
+    free: 1800
+    pro: 14400
+    enterprise: 86400
+
+ramdisk:
+  path: /mnt/ramdisk
+  size: 32G
+  cleanup_hours: 6
+  alert_threshold_pct: 80

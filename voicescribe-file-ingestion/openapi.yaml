@@ -1,0 +1,348 @@
+openapi: 3.1.0
+info:
+  title: File Ingestion API
+  version: 0.1.0
+  description: |
+    File Ingestion Service per upload sicuro e validazione contenuti.
+  x-reusable: true
+
+servers:
+  - url: http://localhost:8001
+    description: Local development
+
+paths:
+  /upload:
+    post:
+      summary: Upload file con validazione streaming
+      operationId: uploadFile
+      security:
+        - InternalToken: []
+      parameters:
+        - name: X-Tenant-Id
+          in: header
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-zA-Z0-9\-]{1,64}$'
+        - name: X-Job-Id
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: X-Expected-SHA256
+          in: header
+          required: false
+          schema:
+            type: string
+            pattern: '^[A-Fa-f0-9]{64}$'
+        - name: X-Free-Tier
+          in: header
+          required: false
+          schema:
+            type: boolean
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Upload completato
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadResponse'
+              example:
+                status: uploaded
+                file:
+                  tenant_id: tenant-123
+                  job_id: 7f3fd6b3-95d7-4f7a-b16e-5f9e2e35c246
+                  file_uuid: d6b149e9-3128-4a40-9179-8fe6839c3ee8
+                  storage_path: /data/input/tenant-123/7f3fd6b3-95d7-4f7a-b16e-5f9e2e35c246/d6b149e9-3128-4a40-9179-8fe6839c3ee8.mp3
+                  size_bytes: 845212
+                  detected_ext: mp3
+                  sha256: 05f80f2f20d901f3f5d608648ca9f223cfdddc3a7fca0e58f5a0eec220f6d0f2
+                  created_at: 2026-03-14T12:00:00Z
+                  updated_at: 2026-03-14T12:00:00Z
+        '400':
+          description: Formato non valido (estensione/magic bytes/checksum)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid_format:
+                  value:
+                    error: http_400
+                    message: Request failed
+                    detail: Magic bytes validation failed
+        '413':
+          description: File troppo grande
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: http_413
+                message: Request failed
+                detail: File too large
+        '422':
+          description: Durata Free Tier superata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: http_422
+                message: Request failed
+                detail: Free tier duration exceeded: 2700.0s > 1800s
+        '401':
+          description: Missing or invalid X-Internal-Token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /files/{job_id}:
+    get:
+      summary: Lista file per job
+      operationId: listFilesByJob
+      security:
+        - InternalToken: []
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Lista file
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileListResponse'
+        '401':
+          description: Missing or invalid X-Internal-Token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      summary: Elimina file e record per job
+      operationId: deleteFilesByJob
+      security:
+        - InternalToken: []
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: File eliminati
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteResponse'
+
+  /probe/{job_id}:
+    get:
+      summary: Probe metadata audio/video
+      operationId: probeJobFile
+      security:
+        - InternalToken: []
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Metadata probe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProbeResponse'
+              example:
+                job_id: 7f3fd6b3-95d7-4f7a-b16e-5f9e2e35c246
+                duration_seconds: 58.42
+                audio_codec: aac
+                sample_rate: 44100
+                channels: 2
+                bitrate: 128000
+                cached: false
+        '404':
+          description: File non trovato per job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Probe timeout o dipendenza assente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /health:
+    get:
+      summary: Health check
+      operationId: svc02_health
+      responses:
+        '200':
+          description: Healthy o degraded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: Unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      operationId: svc02_metrics
+      responses:
+        '200':
+          description: Prometheus text format
+
+components:
+  securitySchemes:
+    InternalToken:
+      type: apiKey
+      in: header
+      name: X-Internal-Token
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        detail:
+          type: string
+          nullable: true
+
+    FileRecord:
+      type: object
+      required: [tenant_id, job_id, file_uuid, storage_path, size_bytes, detected_ext, sha256, created_at, updated_at]
+      properties:
+        tenant_id:
+          type: string
+        job_id:
+          type: string
+          format: uuid
+        file_uuid:
+          type: string
+          format: uuid
+        storage_path:
+          type: string
+        size_bytes:
+          type: integer
+        detected_ext:
+          type: string
+        sha256:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    UploadResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        file:
+          $ref: '#/components/schemas/FileRecord'
+
+    FileListResponse:
+      type: object
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        files:
+          type: array
+          items:
+            $ref: '#/components/schemas/FileRecord'
+
+    DeleteResponse:
+      type: object
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        deleted_files:
+          type: integer
+
+    ProbeResponse:
+      type: object
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        duration_seconds:
+          type: number
+        audio_codec:
+          type: string
+          nullable: true
+        sample_rate:
+          type: integer
+          nullable: true
+        channels:
+          type: integer
+          nullable: true
+        bitrate:
+          type: integer
+          nullable: true
+        cached:
+          type: boolean
+
+    DependencyStatus:
+      type: object
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+          enum: [ok, error]
+        message:
+          type: string
+          nullable: true
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        dependencies:
+          type: array
+          items:
+            $ref: '#/components/schemas/DependencyStatus'
+        timestamp:
+          type: string
+          format: date-time

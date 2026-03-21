@@ -1,0 +1,43 @@
+state_machine:
+  transitions:
+    QUEUED: [PREPROCESSING, FAILED]
+    PREPROCESSING: [TRANSCRIBING, FAILED]
+    TRANSCRIBING: [DIARIZING, EXPORTING, FAILED]
+    DIARIZING: [EXPORTING, FAILED]
+    EXPORTING: [DONE, FAILED]
+    DONE: []
+    FAILED: [QUEUED]
+
+timeouts:
+  preprocessing_seconds: 300
+  transcribing_seconds: 600
+  diarization_seconds: 300
+  export_seconds: 120
+
+retry:
+  network_attempts: 3
+  network_backoff_base: 2
+  http_5xx_attempts: 3
+  http_429_attempts: 5
+
+celery:
+  queues:
+    cpu_tasks:
+      priority:
+        FREE: 1
+        PRO: 5
+        ENTERPRISE: 10
+    gpu_tasks:
+      priority:
+        FREE: 1
+        PRO: 5
+        ENTERPRISE: 10
+    export_tasks:
+      priority:
+        FREE: 1
+        PRO: 5
+        ENTERPRISE: 10
+
+circuit_breaker:
+  failure_threshold: 5
+  recovery_timeout_seconds: 60

@@ -1,0 +1,200 @@
+openapi: 3.1.0
+info:
+  title: Export Service API
+  version: 0.1.0
+  x-reusable: true
+  description: |
+    Standalone document export service. Transforms structured data with timed segments
+    (transcript, diarization, or any similar format) into human-readable documents:
+    TXT, SRT, JSON, DOCX. Can be used for transcription pipelines, meeting reports,
+    or any project requiring document generation from timed text segments.
+
+    Supported formats are configurable via .env (ENABLE_TXT, ENABLE_SRT, etc.).
+    New generators can be added without modifying the public API.
+servers:
+  - url: http://localhost:8007
+    description: Local development
+
+paths:
+  /export:
+    post:
+      summary: Generate documents from timed segments
+      description: |
+        Accepts a generic structure with segments (start, end, text, optional speaker).
+        Tier determines which formats are allowed: Free (txt, srt), PRO/Enterprise (+ json, docx).
+        Returns download URLs for each generated format.
+      security:
+        - InternalToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExportRequest'
+      responses:
+        '200':
+          description: Export completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportResponse'
+        '403':
+          description: Format not allowed for tier
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /cleanup/{job_id}:
+    delete:
+      summary: Delete WAV from Ramdisk
+      description: |
+        Removes the job's WAV file from the Ramdisk. Validates path (no traversal)
+        and file existence. Called by orchestrator after export or on rollback.
+      security:
+        - InternalToken: []
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Cleanup completed
+        '400':
+          description: Invalid path
+        '404':
+          description: File not found
+
+  /webhook/notify:
+    post:
+      summary: Send webhook notification
+      description: |
+        Internal endpoint. Sends POST to tenant webhook_url with job status and
+        download_urls. Retries with backoff on failure.
+      security:
+        - InternalToken: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookNotifyRequest'
+      responses:
+        '200':
+          description: Notification sent
+
+  /health:
+    get:
+      summary: Health check
+      operationId: svc08_health
+      responses:
+        '200':
+          description: Healthy
+
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      operationId: svc08_metrics
+      responses:
+        '200':
+          description: Prometheus text format
+
+components:
+  securitySchemes:
+    InternalToken:
+      type: apiKey
+      in: header
+      name: X-Internal-Token
+
+  schemas:
+    TimedSegment:
+      type: object
+      description: Generic segment with timestamp and text
+      properties:
+        start:
+          type: number
+          description: Start time in seconds
+        end:
+          type: number
+          description: End time in seconds
+        text:
+          type: string
+        speaker:
+          type: string
+          nullable: true
+          description: Speaker label (e.g. SPEAKER_00)
+
+    ExportRequest:
+      type: object
+      required: [job_id, tenant_id, tier, transcript]
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+        tier:
+          type: string
+          enum: [FREE, PRO, ENTERPRISE]
+        transcript:
+          type: object
+          description: TranscriptResult or DiarizationResult (segments with start, end, text, optional speaker)
+        formats:
+          type: array
+          items:
+            type: string
+            enum: [txt, srt, json, docx]
+          nullable: true
+          description: If omitted, generates all formats allowed for tier
+        include_timestamps_txt:
+          type: boolean
+          default: false
+        webhook_url:
+          type: string
+          nullable: true
+
+    ExportResponse:
+      type: object
+      properties:
+        job_id:
+          type: string
+        files:
+          type: array
+          items:
+            type: string
+        download_urls:
+          type: object
+          additionalProperties:
+            type: string
+
+    WebhookNotifyRequest:
+      type: object
+      required: [job_id, webhook_url, download_urls]
+      properties:
+        job_id:
+          type: string
+        tenant_id:
+          type: string
+        webhook_url:
+          type: string
+        download_urls:
+          type: object
+          additionalProperties:
+            type: string
+        status:
+          type: string
+          default: DONE
+
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: string
+          example: TIER_FORBIDDEN
+        message:
+          type: string
+        detail:
+          type: string
+          nullable: true

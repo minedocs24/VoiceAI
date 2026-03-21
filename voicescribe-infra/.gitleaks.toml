@@ -1,0 +1,43 @@
+# Gitleaks config for VoiceScribe Infra
+# Use: gitleaks detect --config .gitleaks.toml
+
+title = "VoiceScribe Gitleaks"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "voicescribe-api-key"
+description = "VoiceScribe API key (vs_live_...)"
+regex = '''vs_live_[a-zA-Z0-9]{32}'''
+tags = ["key", "voicescribe"]
+
+[[rules]]
+id = "huggingface-token"
+description = "HuggingFace token"
+regex = '''hf_[a-zA-Z0-9]{34}'''
+tags = ["key", "huggingface"]
+
+[[rules]]
+id = "redis-password"
+description = "Redis password"
+regex = '''redis://[^:]*:([^@]+)@'''
+tags = ["password", "redis"]
+
+[[rules]]
+id = "postgres-password"
+description = "PostgreSQL password in URL"
+regex = '''postgresql://[^:]*:([^@]+)@'''
+tags = ["password", "postgres"]
+
+[[rules]]
+id = "jwt-secret"
+description = "JWT secret key"
+regex = '''JWT_SECRET[=:]\s*['\"]?[a-zA-Z0-9_-]{20,}'''
+tags = ["secret", "jwt"]
+
+[[rules]]
+id = "internal-token"
+description = "Internal service token"
+regex = '''INTERNAL_SERVICE_TOKEN[=:]\s*['\"]?[a-zA-Z0-9_-]{16,}'''
+tags = ["secret", "internal"]

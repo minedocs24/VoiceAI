@@ -1,0 +1,205 @@
+openapi: 3.1.0
+info:
+  title: Transcription Engine API
+  version: 0.1.0
+  x-reusable: true
+  description: |
+    Standalone transcription service based on Faster-Whisper.
+    The service can be reused in any project requiring speech-to-text,
+    exposes synchronous and asynchronous transcription endpoints, and provides
+    runtime GPU telemetry including VRAM usage and Real-Time Factor (RTF).
+
+    RTF interpretation:
+    - RTF < 1.0 means faster-than-real-time processing
+    - RTF < 0.05 is target for RTX 6000 on short files
+
+    Auto-split behavior:
+    files longer than the configured threshold are split into overlapping chunks,
+    transcribed independently, and reassembled with timestamp offset and overlap deduplication.
+servers:
+  - url: http://localhost:8005
+    description: Local development
+
+paths:
+  /transcribe:
+    post:
+      summary: Synchronous transcription
+      security:
+        - InternalToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TranscribeRequest'
+      responses:
+        '200':
+          description: Transcript completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TranscriptResult'
+
+  /transcribe/async:
+    post:
+      summary: Queue asynchronous transcription
+      security:
+        - InternalToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TranscribeRequest'
+      responses:
+        '200':
+          description: Task queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AsyncTranscribeResponse'
+
+  /tasks/{task_id}/status:
+    get:
+      summary: Get asynchronous task status
+      security:
+        - InternalToken: []
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Task status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskStatusResponse'
+
+  /models:
+    get:
+      summary: List model information
+      responses:
+        '200':
+          description: Active and supported models
+
+  /gpu/status:
+    get:
+      summary: Real-time GPU status
+      responses:
+        '200':
+          description: Current GPU state including VRAM and last RTF
+
+  /health:
+    get:
+      summary: Health check
+      operationId: svc06_health
+      responses:
+        '200':
+          description: Healthy
+        '503':
+          description: Unhealthy
+
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      operationId: svc06_metrics
+      responses:
+        '200':
+          description: Prometheus text format
+
+components:
+  securitySchemes:
+    InternalToken:
+      type: apiKey
+      in: header
+      name: X-Internal-Token
+  schemas:
+    TranscribeRequest:
+      type: object
+      required: [job_id, input_path]
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          nullable: true
+        input_path:
+          type: string
+        beam_size:
+          type: integer
+          nullable: true
+
+    AsyncTranscribeResponse:
+      type: object
+      properties:
+        task_id:
+          type: string
+        job_id:
+          type: string
+
+    TaskStatusResponse:
+      type: object
+      properties:
+        task_id:
+          type: string
+        status:
+          type: string
+          enum: [pending, success, failure]
+        result:
+          $ref: '#/components/schemas/TranscriptResult'
+          nullable: true
+        error:
+          type: string
+          nullable: true
+
+    TranscriptWord:
+      type: object
+      properties:
+        word:
+          type: string
+        start:
+          type: number
+        end:
+          type: number
+        probability:
+          type: number
+
+    TranscriptSegment:
+      type: object
+      properties:
+        start:
+          type: number
+        end:
+          type: number
+        text:
+          type: string
+        confidence:
+          type: number
+        words:
+          type: array
+          items:
+            $ref: '#/components/schemas/TranscriptWord'
+
+    TranscriptResult:
+      type: object
+      required: [job_id, language, duration, rtf, inference_ms, segments]
+      properties:
+        job_id:
+          type: string
+        language:
+          type: string
+        duration:
+          type: number
+        rtf:
+          type: number
+          description: Real-Time Factor, inference_duration / audio_duration
+        inference_ms:
+          type: integer
+        segments:
+          type: array
+          items:
+            $ref: '#/components/schemas/TranscriptSegment'

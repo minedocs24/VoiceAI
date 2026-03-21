@@ -1,0 +1,44 @@
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Certificates and keys
+certs/*.pem
+certs/*.key
+certs/*.csr
+certs/*.crt
+certs/*.srl
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# Docker and runtime data
+*.pid
+*.log
+logs/
+postgres-data/
+redis-data/
+prometheus-data/
+grafana-data/
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build / tmp
+tmp/
+dist/
+build/

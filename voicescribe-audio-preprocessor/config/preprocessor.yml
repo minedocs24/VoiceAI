@@ -1,0 +1,30 @@
+output:
+  sample_rate: 16000
+  channels: 1
+  format: wav
+  sample_width: 16
+
+loudness:
+  target_lufs: -23
+
+noise_reduction:
+  enabled: true
+  afftdn:
+    nr: 12
+    nf: -25
+
+ffmpeg:
+  timeout_seconds: 120
+  threads: 0
+
+output_filename_pattern: "{job_id}.wav"
+
+supported_formats:
+  - mp3
+  - mp4
+  - wav
+  - m4a
+  - ogg
+  - flac
+  - webm
+  - mkv

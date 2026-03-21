@@ -1,0 +1,66 @@
+Metadata-Version: 2.4
+Name: voicescribe-job-orchestrator
+Version: 0.1.0
+Summary: VoiceScribe Job Orchestrator - Pipeline state machine and coordination
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: fastapi>=0.109.0
+Requires-Dist: uvicorn[standard]>=0.27.0
+Requires-Dist: pydantic>=2.5.0
+Requires-Dist: pydantic-settings>=2.1.0
+Requires-Dist: asyncpg>=0.29.0
+Requires-Dist: redis>=5.0.0
+Requires-Dist: celery[redis]>=5.3.0
+Requires-Dist: httpx>=0.26.0
+Requires-Dist: tenacity>=8.2.0
+Requires-Dist: structlog>=24.1.0
+Requires-Dist: pyyaml>=6.0.1
+Requires-Dist: prometheus-client>=0.19.0
+Provides-Extra: dev
+Requires-Dist: pytest>=7.4.0; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.23.0; extra == "dev"
+Requires-Dist: pytest-cov>=4.1.0; extra == "dev"
+Requires-Dist: httpx>=0.26.0; extra == "dev"
+
+# VoiceScribe Job Orchestrator (SVC-05)
+
+Orchestratore della pipeline di trascrizione. Gestisce la state machine dei job, invia task ai servizi downstream e riceve callback.
+
+## State machine
+
+QUEUED → PREPROCESSING → TRANSCRIBING → [DIARIZING] → EXPORTING → DONE  
+(Free Tier salta DIARIZING)  
+Qualsiasi stato → FAILED  
+FAILED → QUEUED (retry)
+
+## Features
+
+- Creazione job e dispatch a SVC-04
+- Callback da SVC-04, SVC-06, SVC-07, SVC-08
+- Circuit breaker e retry con tenacity
+- Rollback best-effort su fallimento
+- Publish Redis `job:{id}:status` a completamento
+- Metriche Prometheus
+
+## Configurazione
+
+1. Copia `.env.example` in `.env`
+2. Configura `DATABASE_URL`, `REDIS_*`, URL servizi, `INTERNAL_SERVICE_TOKEN`
+
+## Avvio
+
+```bash
+python run.py
+```
+
+## Endpoint
+
+- `POST /jobs` — crea job
+- `GET /jobs/{job_id}` — stato job
+- `POST /jobs/{job_id}/retry` — retry job fallito
+- `POST /jobs/{job_id}/cancel` — cancella job
+- `GET /queue/stats` — statistiche code
+- `POST /callbacks/preprocessing-complete` — callback SVC-04
+- `POST /callbacks/transcription-complete` — callback SVC-06
+- `POST /callbacks/diarization-complete` — callback SVC-07
+- `POST /callbacks/export-complete` — callback SVC-08

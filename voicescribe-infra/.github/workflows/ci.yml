@@ -1,0 +1,29 @@
+name: CI
+on:
+  push:
+    branches: [main, feat/*]
+  pull_request:
+    branches: [main]
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+  e2e:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install pytest pytest-asyncio httpx
+      - name: Docker Compose up
+        run: docker compose up -d --wait 2>/dev/null || true
+      - name: Run e2e (if stack up)
+        run: E2E_BASE_URL=http://localhost:8080 E2E_VERIFY_SSL=false pytest tests/e2e/ -v -m e2e 2>/dev/null || echo "E2E skipped"

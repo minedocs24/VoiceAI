@@ -1,0 +1,56 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["prometheus:9090"]
+
+  - job_name: nginx
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["nginx:80"]
+
+  - job_name: voicescribe_svc01_api_gateway
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["voicescribe-api-gateway:8000"]
+
+  - job_name: voicescribe_svc02_file_ingestion
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["voicescribe-file-ingestion:8001"]
+
+  - job_name: voicescribe_svc03_quota_manager
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["voicescribe-quota-manager:8002"]
+
+  - job_name: voicescribe_svc04_audio_preprocessor
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["voicescribe-audio-preprocessor:8003"]
+
+  - job_name: voicescribe_svc05_job_orchestrator
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["voicescribe-job-orchestrator:8004"]
+
+  - job_name: voicescribe_svc06_transcription_engine
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["voicescribe-transcription-engine:8005"]
+
+  - job_name: voicescribe_svc07_diarization_engine
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["voicescribe-diarization-engine:8006"]
+
+  - job_name: voicescribe_svc08_export_service
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["voicescribe-export-service:8007"]

@@ -1,0 +1,193 @@
+openapi: 3.1.0
+info:
+  title: Audio Preprocessor API
+  version: 0.1.0
+  description: |
+    Audio preprocessing service. Converts input audio to WAV 16kHz mono for transcription.
+    Uses Celery for async processing with FFmpeg pipeline.
+
+servers:
+  - url: http://localhost:8003
+    description: Local development
+
+paths:
+  /preprocess:
+    post:
+      summary: Queue preprocessing task
+      operationId: queuePreprocess
+      security:
+        - InternalToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PreprocessRequest'
+      responses:
+        '200':
+          description: Task queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreprocessResponse'
+        '400':
+          description: Invalid job_id or tenant_id
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid X-Internal-Token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /preprocess/{task_id}/status:
+    get:
+      summary: Get task status
+      operationId: getPreprocessStatus
+      security:
+        - InternalToken: []
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Celery task ID
+      responses:
+        '200':
+          description: Task status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreprocessStatusResponse'
+        '401':
+          description: Missing or invalid X-Internal-Token
+
+  /formats:
+    get:
+      summary: List supported audio formats
+      operationId: getFormats
+      responses:
+        '200':
+          description: Supported formats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FormatsResponse'
+
+  /health:
+    get:
+      summary: Health check
+      operationId: svc04_health
+      responses:
+        '200':
+          description: Healthy
+        '503':
+          description: Unhealthy
+
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      operationId: svc04_metrics
+      responses:
+        '200':
+          description: Prometheus text format
+
+components:
+  securitySchemes:
+    InternalToken:
+      type: apiKey
+      in: header
+      name: X-Internal-Token
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        detail:
+          type: string
+          nullable: true
+
+    PreprocessRequest:
+      type: object
+      required: [job_id, tenant_id]
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          pattern: '^[a-zA-Z0-9\-]{1,64}$'
+        input_path:
+          type: string
+          nullable: true
+          description: Optional; if omitted, fetched from SVC-02
+
+    PreprocessResponse:
+      type: object
+      required: [task_id, job_id]
+      properties:
+        task_id:
+          type: string
+        job_id:
+          type: string
+          format: uuid
+
+    PreprocessStatusResponse:
+      type: object
+      required: [task_id, status]
+      properties:
+        task_id:
+          type: string
+        status:
+          type: string
+          enum: [pending, success, failure]
+        result:
+          type: object
+          nullable: true
+        error:
+          type: string
+          nullable: true
+
+    FormatsResponse:
+      type: object
+      required: [formats]
+      properties:
+        formats:
+          type: array
+          items:
+            type: string
+
+    DependencyStatus:
+      type: object
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+          enum: [ok, error]
+        message:
+          type: string
+          nullable: true
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        dependencies:
+          type: array
+          items:
+            $ref: '#/components/schemas/DependencyStatus'
+        timestamp:
+          type: string
+          format: date-time

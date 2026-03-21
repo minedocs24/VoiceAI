@@ -1,0 +1,15 @@
+# Configurazione Quota Manager - parametri non segreti
+# Letti all'avvio, modificabili senza ricompilare
+
+quota:
+  # Limite giornaliero default per tenant Free Tier
+  daily_limit: 2
+  # Soglia quota_exceeded_attempts oltre la quale un tenant è candidato upgrade
+  upgrade_candidate_threshold: 5
+  # Giorni di storico da conservare in free_tier_usage (cleanup periodico)
+  retention_days: 90
+
+database:
+  pool_size: 5
+  max_overflow: 10
+  pool_timeout: 30

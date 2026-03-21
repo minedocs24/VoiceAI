@@ -1,0 +1,446 @@
+openapi: 3.1.0
+info:
+  title: Quota Manager API
+  version: 0.1.0
+  description: |
+    Quota Manager Service - Freemium quota enforcement.
+    Manages daily usage limits with Redis for real-time operations and PostgreSQL for analytics.
+  x-reusable: true
+
+servers:
+  - url: http://localhost:8002
+    description: Local development
+
+paths:
+  /quota/check/{tenant_id}:
+    get:
+      summary: Check quota without consuming
+      description: Returns whether the tenant has remaining quota for the current day (UTC).
+      operationId: checkQuota
+      parameters:
+        - name: tenant_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-zA-Z0-9\-]{1,64}$'
+          description: Tenant identifier
+      responses:
+        '200':
+          description: Quota check result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuotaCheckResponse'
+        '400':
+          description: Invalid tenant_id
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid X-Internal-Token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Tenant not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Service unavailable (Redis/DB down)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - InternalToken: []
+
+  /quota/consume/{tenant_id}:
+    post:
+      summary: Consume one unit of quota
+      description: Atomically consumes one unit. Returns 429 if quota exceeded.
+      operationId: consumeQuota
+      parameters:
+        - name: tenant_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-zA-Z0-9\-]{1,64}$'
+      responses:
+        '200':
+          description: Quota consumed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuotaConsumeResponse'
+        '400':
+          description: Invalid tenant_id
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid X-Internal-Token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Tenant not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Quota exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuotaConsumeResponse'
+              example:
+                consumed: false
+                used: 2
+                limit: 2
+                remaining: 0
+        '503':
+          description: Service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - InternalToken: []
+
+  /quota/status/{tenant_id}:
+    get:
+      summary: Get quota status for tenant
+      description: Returns current usage and limit for the day.
+      operationId: getQuotaStatus
+      parameters:
+        - name: tenant_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-zA-Z0-9\-]{1,64}$'
+      responses:
+        '200':
+          description: Quota status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuotaStatusResponse'
+        '400':
+          description: Invalid tenant_id
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid X-Internal-Token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Tenant not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - InternalToken: []
+
+  /quota/rollback/{tenant_id}:
+    post:
+      summary: Rollback consumed quota
+      description: Decrements usage by one. Idempotent when key expired or already 0.
+      operationId: rollbackQuota
+      parameters:
+        - name: tenant_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-zA-Z0-9\-]{1,64}$'
+      responses:
+        '200':
+          description: Rollback result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuotaRollbackResponse'
+        '400':
+          description: Invalid tenant_id
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid X-Internal-Token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Tenant not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - InternalToken: []
+
+  /analytics:
+    get:
+      summary: Analytics for upgrade candidates
+      description: Returns tenants sorted by quota_exceeded_attempts (desc). Supports filters and pagination.
+      operationId: getAnalytics
+      parameters:
+        - name: from_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: min_exceeded
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Analytics data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyticsResponse'
+        '401':
+          description: Missing or invalid X-Internal-Token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - InternalToken: []
+
+  /health:
+    get:
+      summary: Health check
+      description: Returns status of service and dependencies (Redis, PostgreSQL).
+      operationId: svc03_healthCheck
+      responses:
+        '200':
+          description: Service healthy or degraded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: Service unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      description: Exposes Prometheus metrics for monitoring.
+      operationId: svc03_getMetrics
+      responses:
+        '200':
+          description: Prometheus text format
+
+components:
+  securitySchemes:
+    InternalToken:
+      type: apiKey
+      in: header
+      name: X-Internal-Token
+      description: Token for inter-service authentication
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+          description: Error code
+        message:
+          type: string
+          description: Human-readable message
+        detail:
+          type: string
+          nullable: true
+          description: Optional detail
+
+    QuotaCheckResponse:
+      type: object
+      required: [allowed, used, limit, remaining]
+      properties:
+        allowed:
+          type: boolean
+        used:
+          type: integer
+          minimum: 0
+        limit:
+          type: integer
+          minimum: 1
+        remaining:
+          type: integer
+          minimum: 0
+
+    QuotaConsumeResponse:
+      type: object
+      required: [consumed, used, limit, remaining]
+      properties:
+        consumed:
+          type: boolean
+        used:
+          type: integer
+          minimum: 0
+        limit:
+          type: integer
+          minimum: 1
+        remaining:
+          type: integer
+          minimum: 0
+
+    QuotaStatusResponse:
+      type: object
+      required: [tenant_id, usage_date, used_count, limit, remaining]
+      properties:
+        tenant_id:
+          type: string
+        usage_date:
+          type: string
+          format: date
+        used_count:
+          type: integer
+          minimum: 0
+        limit:
+          type: integer
+          minimum: 1
+        remaining:
+          type: integer
+          minimum: 0
+        reset_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    QuotaRollbackResponse:
+      type: object
+      required: [rolled_back, used, limit, message]
+      properties:
+        rolled_back:
+          type: boolean
+        used:
+          type: integer
+          minimum: 0
+        limit:
+          type: integer
+          minimum: 1
+        message:
+          type: string
+
+    AnalyticsItem:
+      type: object
+      properties:
+        tenant_id:
+          type: string
+        usage_date:
+          type: string
+          format: date
+        used_count:
+          type: integer
+        quota_exceeded_attempts:
+          type: integer
+
+    AnalyticsResponse:
+      type: object
+      required: [items, total, page, page_size]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AnalyticsItem'
+        total:
+          type: integer
+          minimum: 0
+        page:
+          type: integer
+          minimum: 1
+        page_size:
+          type: integer
+          minimum: 1
+          maximum: 100
+
+    DependencyStatus:
+      type: object
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+          enum: [ok, error]
+        message:
+          type: string
+          nullable: true
+
+    HealthResponse:
+      type: object
+      required: [status, dependencies]
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        dependencies:
+          type: array
+          items:
+            $ref: '#/components/schemas/DependencyStatus'
+        timestamp:
+          type: string
+          format: date-time

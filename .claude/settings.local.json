@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(for dir:*)",
+      "Bash(do echo:*)",
+      "Bash(for service:*)",
+      "Bash(for svc:*)",
+      "Read(//d/Ivan Arpino2/Projects/VoiceScribe AI/**)",
+      "Bash(done)",
+      "Bash(grep -r voicescribe-infra 'D:/Ivan Arpino2/Projects/VoiceScribe AI' --include=*.yml --include=*.yaml --include=*.md --include=*.sh --include=*.toml -l)"
+    ],
+    "defaultMode": "bypassPermissions"
+  }
+}

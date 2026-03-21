@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "voicescribe-transcription-engine"
+version = "0.1.0"
+description = "Standalone transcription engine service based on Faster-Whisper"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    "celery[redis]>=5.3.0",
+    "redis>=5.0.0",
+    "structlog>=24.1.0",
+    "pyyaml>=6.0.1",
+    "prometheus-client>=0.19.0",
+    "httpx>=0.26.0",
+    "faster-whisper>=1.0.3",
+    "torch>=2.2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "httpx>=0.26.0",
+    "jiwer>=3.0.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+    "gpu: test richiede GPU NVIDIA fisica",
+]
+filterwarnings = ["ignore::DeprecationWarning"]

@@ -1,0 +1,40 @@
+security:
+  allowed_file_extensions:
+    - wav
+    - mp3
+    - m4a
+    - flac
+    - ogg
+    - mp4
+    - mov
+    - mkv
+
+  upload_max_bytes_per_tier:
+    free: 2147483648
+    pro: 2147483648
+    enterprise: 2147483648
+
+  rate_limiting:
+    by_tier_per_minute:
+      free: 10
+      pro: 100
+      enterprise: 300
+    nginx:
+      upload_rpm: 5
+      read_rpm: 60
+      burst_upload: 5
+      burst_read: 30
+
+  jwt:
+    algorithm: RS256
+    access_token_minutes: 15
+    refresh_token_hours: 24
+
+  crypto_allowed_algorithms:
+    jwt:
+      - RS256
+      - ES256
+    hashes:
+      - SHA-256
+      - SHA-512
+    tls_min_version: TLSv1.2
