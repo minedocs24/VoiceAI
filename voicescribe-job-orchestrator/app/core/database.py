@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
@@ -125,7 +126,7 @@ async def transition_job(
             })
 
             updates = ["status = $2", "status_history = $3::jsonb", "updated_at = NOW()"]
-            params: list[Any] = [job_id, to_status, history]
+            params: list[Any] = [job_id, to_status, json.dumps(history)]
             idx = 4
             if ramdisk_path is not None:
                 updates.append(f"ramdisk_path = ${idx}")
