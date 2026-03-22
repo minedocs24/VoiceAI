@@ -226,9 +226,29 @@ async def download_job(
             detail=f"Format {fmt} not available for your tier. Allowed: {', '.join(allowed)}",
         )
 
-    # TODO: Proxy to SVC-08 Export or read from storage when SVC-08 exists
-    # For now return 501
-    raise HTTPException(
-        status_code=501,
-        detail="Export service not yet implemented. Download will be available when SVC-08 is deployed.",
-    )
+    if job["status"] != "DONE":
+        raise HTTPException(status_code=404, detail="Export not ready — job has not completed yet")
+
+    # Proxy to SVC-08 Export Service
+    svc08_url = settings.svc08_url.rstrip("/")
+    download_url = f"{svc08_url}/export/download/{job_id}/{fmt.lower()}?tenant_id={tenant.tenant_id}"
+    try:
+        async with httpx.AsyncClient(timeout=settings.upstream_timeout_seconds) as client:
+            resp = await client.get(
+                download_url,
+                headers={"X-Internal-Token": settings.internal_service_token},
+            )
+        if resp.status_code == 404:
+            raise HTTPException(status_code=404, detail="Export file not found — ensure the job is DONE")
+        if resp.status_code != 200:
+            raise HTTPException(status_code=502, detail="Export service error")
+        return Response(
+            content=resp.content,
+            media_type=resp.headers.get("content-type", "application/octet-stream"),
+            headers={"Content-Disposition": resp.headers.get("content-disposition", f'attachment; filename="transcript.{fmt.lower()}"')},
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("svc08_proxy_failed", error=str(e), job_id=job_id, fmt=fmt)
+        raise HTTPException(status_code=503, detail="Export service unavailable")

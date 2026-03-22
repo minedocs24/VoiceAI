@@ -103,9 +103,7 @@ def run_export(
         path = out_dir / fname
         path.write_text(content, encoding="utf-8")
         files_created.append(str(path))
-        url = _build_download_url(tenant_id, job_id, fname)
-        if url:
-            download_urls["srt"] = url
+        download_urls["srt"] = _build_download_url(tenant_id, job_id, fname)
 
     if "json" in enabled:
         json_gen = JsonGenerator()

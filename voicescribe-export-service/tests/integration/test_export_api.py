@@ -87,6 +87,60 @@ def test_export_free_txt_srt(client):
         assert "srt" in data["download_urls"]
 
 
+def test_download_export_not_found(client, tmp_path):
+    """GET /export/download returns 404 when the file does not exist."""
+    with patch("app.core.config.settings") as s:
+        s.internal_service_token = "test-token"
+        s.output_base_path = str(tmp_path / "nonexistent")
+        resp = client.get(
+            "/export/download/550e8400-e29b-41d4-a716-446655440000/txt?tenant_id=t1",
+            headers={"X-Internal-Token": "test-token"},
+        )
+    assert resp.status_code == 404
+
+
+def test_download_export_unknown_format(client, tmp_path):
+    """GET /export/download returns 400 for unknown format."""
+    with patch("app.core.config.settings") as s:
+        s.internal_service_token = "test-token"
+        s.output_base_path = str(tmp_path)
+        resp = client.get(
+            "/export/download/550e8400-e29b-41d4-a716-446655440000/xyz?tenant_id=t1",
+            headers={"X-Internal-Token": "test-token"},
+        )
+    assert resp.status_code == 400
+
+
+def test_download_export_serves_file(client, temp_output_dir):
+    """GET /export/download serves an existing TXT file."""
+    job_id = "550e8400-e29b-41d4-a716-446655440000"
+    tenant_id = "t1"
+    out_dir = temp_output_dir / tenant_id / job_id
+    out_dir.mkdir(parents=True)
+    (out_dir / "transcript.txt").write_text("Hello World")
+
+    with patch("app.core.config.settings") as s:
+        s.internal_service_token = "test-token"
+        s.output_base_path = str(temp_output_dir)
+        resp = client.get(
+            f"/export/download/{job_id}/txt?tenant_id={tenant_id}",
+            headers={"X-Internal-Token": "test-token"},
+        )
+    assert resp.status_code == 200
+    assert resp.content == b"Hello World"
+
+
+def test_download_export_requires_auth(client, tmp_path):
+    """GET /export/download returns 401 without internal token."""
+    with patch("app.core.config.settings") as s:
+        s.internal_service_token = "test-token"
+        s.output_base_path = str(tmp_path)
+        resp = client.get(
+            "/export/download/550e8400-e29b-41d4-a716-446655440000/txt?tenant_id=t1",
+        )
+    assert resp.status_code == 401
+
+
 def test_cleanup_endpoint(client):
     """Cleanup endpoint requires auth and valid job_id."""
     with patch("app.core.config.settings") as s:

@@ -9,7 +9,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from app.api.cleanup import router as cleanup_router
-from app.api.health_metrics import health_router, metrics_router
+from app.api.health_metrics import router as health_router, metrics_router
 from app.api.routers import router as export_router
 from app.api.webhook import router as webhook_router
 

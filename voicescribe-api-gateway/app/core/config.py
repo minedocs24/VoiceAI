@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     svc02_url: str = Field(default="http://voicescribe-file-ingestion:8001")
     svc03_url: str = Field(default="http://voicescribe-quota-manager:8002")
     svc05_url: str = Field(default="http://voicescribe-job-orchestrator:8004")
+    svc08_url: str = Field(default="http://voicescribe-export-service:8007")
 
     # Internal auth
     internal_service_token: str = Field(default="")

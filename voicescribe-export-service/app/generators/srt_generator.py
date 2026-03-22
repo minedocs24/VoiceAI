@@ -42,7 +42,28 @@ def _split_segment_for_srt(
     if not words:
         return [(start, end, prefix.strip() or "...")]
 
-    sub_segments: list[tuple[float, float, str]] = []
+    # If there's a single word that exceeds max_chars, split by characters instead
+    effective_max = max_chars - len(prefix)
+    if effective_max < 10:
+        effective_max = 10  # always allow at least 10 chars of text
+    if len(words) == 1 and len(text) > max_chars:
+        chunks = [text[i : i + effective_max] for i in range(0, len(text), effective_max)]
+        total_chars = len(text)
+        sub_segments: list[tuple[float, float, str]] = []
+        seg_start = start
+        for chunk in chunks:
+            chunk_duration = duration * len(chunk) / total_chars
+            seg_end = seg_start + chunk_duration
+            txt = f"{prefix}{chunk}".strip() if has_speaker else chunk
+            sub_segments.append((seg_start, seg_end, txt))
+            seg_start = seg_end
+        # align last segment end with original end
+        if sub_segments:
+            last = sub_segments[-1]
+            sub_segments[-1] = (last[0], end, last[2])
+        return sub_segments
+
+    sub_segments = []
     current_text: list[str] = []
     current_start = start
     word_duration = duration / len(words) if words else 0

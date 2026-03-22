@@ -26,14 +26,16 @@ def pro_token():
     return token
 
 
+@patch("app.api.routers.jobs.svc05_dispatch", new_callable=AsyncMock)
 @patch("app.api.routers.jobs.svc02_upload", new_callable=AsyncMock)
 @patch("app.api.routers.jobs.insert_job", new_callable=AsyncMock)
 @patch("app.api.routers.jobs.check_rate_limit", new_callable=AsyncMock)
-def test_transcribe_pro_no_quota(mock_rate_limit, mock_insert, mock_upload, client, pro_token):
+def test_transcribe_pro_no_quota(mock_rate_limit, mock_insert, mock_upload, mock_dispatch, client, pro_token):
     """PRO user can upload without quota check."""
     mock_rate_limit.return_value = (True, 100, 99, 999999)
     mock_upload.return_value = {"status": "uploaded"}
     mock_insert.return_value = None
+    mock_dispatch.return_value = None
 
     r = client.post(
         "/v1/transcribe",

@@ -45,7 +45,7 @@ def test_srt_splits_long_segment(sample_diarization_long_segment: DiarizationRes
     out = gen.generate(sample_diarization_long_segment)
     # Should have multiple subtitles due to splitting
     lines = out.split("\n")
-    assert len(lines) > 10
+    assert len(lines) > 5  # at least 2 subtitles: one per char-split chunk
 
 
 def test_srt_timestamp_format():

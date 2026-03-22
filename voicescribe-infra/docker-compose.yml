@@ -116,6 +116,7 @@ services:
       SVC02_URL: http://voicescribe-file-ingestion:8001
       SVC03_URL: http://voicescribe-quota-manager:8002
       SVC05_URL: http://voicescribe-job-orchestrator:8004
+      SVC08_URL: http://voicescribe-export-service:8007
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
     depends_on:
