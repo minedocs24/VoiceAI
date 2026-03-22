@@ -60,7 +60,7 @@ class Settings(BaseSettings):
     port: int = Field(default=8000, ge=1, le=65535)
     cors_origins: str = Field(default="http://localhost:3000,http://localhost:8000")
     log_level: str = Field(default="INFO")
-    swagger_ui_enabled: bool = Field(default=True)
+    swagger_ui_enabled: bool = Field(default=False)
 
     # Timeouts (seconds)
     upstream_timeout_seconds: int = Field(default=30, ge=1)
@@ -70,6 +70,12 @@ class Settings(BaseSettings):
     def redis_url(self) -> str:
         auth = f":{self.redis_password}@" if self.redis_password else ""
         return f"redis://{auth}{self.redis_host}:{self.redis_port}/{self.redis_db}"
+
+    def model_post_init(self, __context) -> None:
+        if not self.jwt_secret_key:
+            raise ValueError("JWT_SECRET_KEY must be set — refusing to start with empty JWT secret")
+        if not self.internal_service_token:
+            raise ValueError("INTERNAL_SERVICE_TOKEN must be set — refusing to start with empty internal token")
 
 
 settings = Settings()
