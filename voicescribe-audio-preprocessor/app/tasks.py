@@ -151,11 +151,13 @@ def preprocess_task(
         )
         raise Reject(reason=str(e), requeue=False)
 
-    # Guardia quota secondaria
+    # Secondary quota guard — check only, do NOT rollback.
+    # Quota was already consumed at the gateway layer; rolling back here
+    # would grant the tenant a free extra job if Redis evicted the key.
     if not _check_quota(tenant_id):
         QUOTA_CHECK_FAILURES_TOTAL.inc()
         PREPROCESS_TASKS_TOTAL.labels(status="quota_exceeded").inc()
-        _rollback_quota(tenant_id)
+        logger.warning("secondary_quota_check_failed", job_id=job_id, tenant_id=tenant_id)
         _notify_svc05(
             job_id=job_id,
             tenant_id=tenant_id,
