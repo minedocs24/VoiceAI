@@ -6,49 +6,54 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 VoiceScribe AI is a microservices-based audio transcription platform. It processes uploaded audio files through a pipeline: ingestion → preprocessing → transcription (Faster-Whisper) → optional diarization (Pyannote) → export. The full stack runs via Docker Compose orchestrated from `voicescribe-infra/`.
 
-## Common Commands
-
-All infrastructure commands run from `voicescribe-infra/`:
+## First-Time Setup
 
 ```bash
-make up              # Start full stack
-make down            # Stop stack
-make reset CONFIRM=yes  # Destroy stack + volumes
-make migrate         # Run Alembic DB migrations
-make health          # Healthcheck all services
-make logs            # Follow all service logs
-make logs-<service>  # Follow specific service logs
-make e2e             # Run E2E tests (requires make seed-e2e first)
-make seed-e2e        # Seed test users (free@test.local / password)
-make certs-dev       # Generate self-signed dev certificates
-make ramdisk-setup   # Configure tmpfs ramdisk on host
+cd voicescribe-infra
+cp .env.example .env        # Fill in passwords and tokens
+make certs-dev              # Generate self-signed TLS certs (dev only)
+make ramdisk-setup          # Configure tmpfs ramdisk on host (Linux only)
+make up                     # Start full stack
+make migrate                # Run DB migrations (first time and after schema changes)
+make seed-e2e               # Seed test users (free@test.local / password)
 ```
 
-Per-service development (from any service directory):
+## Running the Stack
+
+### Full stack (recommended)
+
+All commands run from `voicescribe-infra/`:
 
 ```bash
-pip install -e .[dev]   # Install with dev extras
-python run.py            # Start HTTP server
-pytest tests/            # Run all tests
-pytest tests/path/to/test_file.py::test_name  # Run single test
+make up                     # Start all services + infrastructure
+make down                   # Stop stack
+make reset CONFIRM=yes      # Destroy stack + volumes (destructive)
+make health                 # Healthcheck all services
+make logs                   # Follow all service logs
+make logs-<service>         # Follow specific service logs (e.g. logs-nginx)
+make e2e                    # Run E2E tests (requires seed-e2e first)
 ```
 
-Celery workers for async services (SVC-04, 06, 07, 08):
+In development, `docker-compose.override.yml` is auto-applied and exposes:
+- Nginx on `http://localhost:8080` (HTTP, no TLS check needed)
+- PostgreSQL on `localhost:15432`, Redis on `localhost:16379`
+- Prometheus on `localhost:9090`, Grafana on `localhost:3000`
+
+### Single service (local dev)
+
+From any service directory (requires infrastructure already running via `make up`):
 
 ```bash
-celery -A app.celery_app worker -Q cpu_tasks -c 12 --loglevel=info
-celery -A app.celery_app worker -Q gpu_tasks -c 1 --loglevel=info
-celery -A app.celery_app worker -Q export_tasks -c 4 --loglevel=info
-celery -A app.celery_app beat --loglevel=info  # Periodic cleanup (SVC-08)
+pip install -e .[dev]
+python run.py                                              # Start HTTP server
+pytest tests/                                             # Run all tests
+pytest tests/path/to/test_file.py::test_name             # Run single test
 ```
 
-Code quality (Python 3.11+, line-length 100):
+### Code quality (Python 3.11+, line-length 100)
 
 ```bash
-black .
-isort .
-mypy .
-bandit -r app/
+black . && isort . && mypy . && bandit -r app/
 ```
 
 ## Architecture
