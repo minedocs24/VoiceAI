@@ -14,7 +14,7 @@ from structlog import get_logger
 
 from app.core.config import settings
 from app.core.metrics import CALLBACK_RETRIES_TOTAL, PREPROCESS_DURATION_SECONDS, PREPROCESS_TASKS_TOTAL, QUOTA_CHECK_FAILURES_TOTAL
-from app.services.ffmpeg_pipeline import InputError, SystemError, run_preprocess
+from app.services.ffmpeg_pipeline import FFmpegTransientError, InputError, run_preprocess
 
 logger = get_logger(__name__)
 
@@ -186,7 +186,7 @@ def preprocess_task(
             error_message=str(e),
         )
         raise Reject(reason=str(e), requeue=False)
-    except SystemError as e:
+    except FFmpegTransientError as e:
         retries = self.request.retries
         if retries >= MAX_RETRIES - 1:
             PREPROCESS_TASKS_TOTAL.labels(status="system_error").inc()

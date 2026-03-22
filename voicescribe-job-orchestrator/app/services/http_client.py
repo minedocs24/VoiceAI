@@ -58,6 +58,13 @@ class CircuitBreaker:
             raise
 
 
+# Per-process in-memory circuit breaker state.
+# IMPORTANT: This state is NOT shared across multiple Uvicorn worker processes
+# or container replicas. If the orchestrator is scaled horizontally, each process
+# tracks failures independently and the threshold may never be reached collectively.
+# For horizontal scaling, replace with a Redis-backed implementation using
+# INCR/EXPIRE to share failure counts across all workers.
+# By design, this service runs as a single-worker container (see docker-compose.yml).
 _circuit_breakers: dict[str, CircuitBreaker] = {}
 
 

@@ -26,24 +26,20 @@ async def create_job_endpoint(
     """Create job in QUEUED, send task to SVC-04, transition to PREPROCESSING."""
     from app.core.database import get_job_for_update
 
-    if body.job_id:
-        # Job already exists (from api-gateway); verify and dispatch
-        job_id = UUID(body.job_id)
-        job = await get_job_for_update(job_id)
-        if not job:
-            raise HTTPException(status_code=404, detail="Job not found")
-        if job["status"] != "QUEUED":
-            raise HTTPException(
-                status_code=422,
-                detail=f"Job already in state {job['status']}, cannot dispatch",
-            )
-    else:
-        job_id = uuid4()
-        await create_job(
-            job_id=job_id,
-            tenant_id=body.tenant_id,
-            tier=body.tier,
-            duration_seconds=body.duration_seconds,
+    if not body.job_id:
+        raise HTTPException(
+            status_code=422,
+            detail="job_id is required — job must be pre-created by api-gateway",
+        )
+
+    job_id = UUID(body.job_id)
+    job = await get_job_for_update(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job["status"] != "QUEUED":
+        raise HTTPException(
+            status_code=422,
+            detail=f"Job already in state {job['status']}, cannot dispatch",
         )
     try:
         task_id = call_svc04_preprocess(str(job_id), body.tenant_id, input_path=None)

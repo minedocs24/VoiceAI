@@ -26,8 +26,8 @@ class InputError(PreprocessError):
     pass
 
 
-class SystemError(PreprocessError):
-    """System/temporary error - retry with backoff."""
+class FFmpegTransientError(PreprocessError):
+    """Transient system error (FFmpeg crash, resource exhaustion) — retry with backoff."""
 
     pass
 

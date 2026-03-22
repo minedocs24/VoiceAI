@@ -5,8 +5,9 @@ from pathlib import Path
 import pytest
 
 from app.services.ffmpeg_pipeline import (
+    FFmpegTransientError,
     InputError,
-    SystemError,
+    PreprocessError,
     build_filter_complex,
     run_preprocess,
 )
@@ -33,6 +34,13 @@ def test_run_preprocess_file_not_found(tmp_path):
             str(tmp_path / "nonexistent.wav"),
             str(tmp_path / "out.wav"),
         )
+
+
+def test_ffmpeg_transient_error_is_distinct_from_builtin_system_error():
+    """FFmpegTransientError must not shadow the builtin SystemError."""
+    assert FFmpegTransientError is not SystemError
+    assert issubclass(FFmpegTransientError, PreprocessError)
+    assert not issubclass(FFmpegTransientError, SystemError)
 
 
 def test_run_preprocess_success(sample_wav, tmp_path):

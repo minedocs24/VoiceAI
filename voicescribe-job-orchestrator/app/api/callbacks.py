@@ -28,9 +28,20 @@ router = APIRouter(prefix="/callbacks", tags=["callbacks"])
 
 
 def _do_rollback(job_id: str) -> None:
-    """Best-effort rollback: SVC-02 delete files, SVC-08 cleanup."""
-    call_svc02_delete_files(job_id)
-    call_svc08_cleanup(job_id)
+    """Best-effort rollback: SVC-02 delete files, SVC-08 cleanup. Logs failures."""
+    ok_svc02 = call_svc02_delete_files(job_id)
+    if not ok_svc02:
+        logger.error("rollback_svc02_failed", job_id=job_id,
+                     detail="file deletion failed — orphaned input files possible")
+    else:
+        logger.info("rollback_svc02_ok", job_id=job_id)
+
+    ok_svc08 = call_svc08_cleanup(job_id)
+    if not ok_svc08:
+        logger.warning("rollback_svc08_failed", job_id=job_id,
+                       detail="export cleanup failed — orphaned output files possible")
+    else:
+        logger.info("rollback_svc08_ok", job_id=job_id)
 
 
 async def _transition_and_trigger(

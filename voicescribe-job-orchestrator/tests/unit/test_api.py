@@ -49,18 +49,17 @@ def test_create_job_requires_auth(client):
 
 
 def test_create_job_success(client, auth_headers):
+    """POST /jobs with an existing job_id (pre-created by api-gateway) dispatches preprocessing."""
     job_id = uuid4()
+    fake_job = {"id": job_id, "status": "QUEUED", "tier_at_creation": "FREE", "tenant_id": "t1"}
     with (
-        patch("app.api.jobs.uuid4", return_value=job_id),
-        patch("app.core.database.create_job", new_callable=AsyncMock) as mock_create,
-        patch("app.core.database.transition_job", new_callable=AsyncMock) as mock_transition,
+        patch("app.core.database.get_job_for_update", new_callable=AsyncMock, return_value=fake_job),
+        patch("app.core.database.transition_job", new_callable=AsyncMock, return_value=True),
         patch("app.services.http_client.call_svc04_preprocess", return_value="task-123"),
     ):
-        mock_create.return_value = {"id": job_id}
-        mock_transition.return_value = True
         r = client.post(
             "/jobs",
-            json={"tenant_id": "t1", "tier": "FREE"},
+            json={"job_id": str(job_id), "tenant_id": "t1", "tier": "FREE"},
             headers=auth_headers,
         )
     assert r.status_code == 200
@@ -79,3 +78,9 @@ def test_get_job_404(client, auth_headers):
 def test_queue_stats_requires_auth(client):
     r = client.get("/queue/stats")
     assert r.status_code == 401
+
+
+def test_create_job_requires_job_id(client, auth_headers):
+    """POST /jobs without job_id must return 422 — dead code path removed."""
+    r = client.post("/jobs", json={"tenant_id": "t1", "tier": "FREE"}, headers=auth_headers)
+    assert r.status_code == 422
