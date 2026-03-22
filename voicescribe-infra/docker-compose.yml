@@ -117,7 +117,7 @@ services:
       SVC03_URL: http://voicescribe-quota-manager:8002
       SVC05_URL: http://voicescribe-job-orchestrator:8004
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN}
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev-jwt-secret-change-in-production}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
     depends_on:
       postgres:
         condition: service_healthy

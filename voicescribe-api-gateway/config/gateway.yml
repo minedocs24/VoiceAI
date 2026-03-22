@@ -29,7 +29,7 @@ cors:
 tier_features:
   free:
     duration_max_seconds: 1800
-    export_formats: ["txt", "srt", "json"]
+    export_formats: ["txt", "srt"]
     diarization_enabled: false
     file_max_bytes: 2147483648
   pro:
