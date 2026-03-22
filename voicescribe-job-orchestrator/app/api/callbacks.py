@@ -271,7 +271,7 @@ async def export_complete(
     if body.success:
         ok = await _transition_and_trigger(job_id, "EXPORTING", "DONE")
         if ok:
-            publish_job_status(
+            await publish_job_status(
                 str(job_id),
                 "DONE",
                 {

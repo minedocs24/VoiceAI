@@ -37,7 +37,7 @@ async def lifespan(app: FastAPI):
     yield
     from app.core.redis_client import close_redis
     await close_pool()
-    close_redis()
+    await close_redis()
 
 
 def create_app() -> FastAPI:

@@ -84,3 +84,15 @@ def test_create_job_requires_job_id(client, auth_headers):
     """POST /jobs without job_id must return 422 — dead code path removed."""
     r = client.post("/jobs", json={"tenant_id": "t1", "tier": "FREE"}, headers=auth_headers)
     assert r.status_code == 422
+
+
+import asyncio
+import inspect
+
+
+def test_publish_job_status_is_coroutine():
+    """publish_job_status must be async — sync Redis blocks the event loop in FastAPI routes."""
+    from app.core.redis_client import publish_job_status
+    assert asyncio.iscoroutinefunction(publish_job_status), (
+        "publish_job_status must be async — sync Redis blocks the event loop in FastAPI routes"
+    )
