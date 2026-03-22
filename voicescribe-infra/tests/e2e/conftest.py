@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 
 import pytest
+import yaml
 
 # Base URL for API (via nginx or direct to api-gateway)
 BASE_URL = os.environ.get("E2E_BASE_URL", "https://localhost")
@@ -31,6 +32,22 @@ def verify_ssl():
 def compose_project_dir():
     """Path to docker-compose project (voicescribe-infra)."""
     return Path(__file__).resolve().parent.parent.parent
+
+
+@pytest.fixture(scope="session")
+def free_tier_quota_limit() -> int:
+    """Daily quota limit for Free Tier, read from quota manager config."""
+    quota_yml = (
+        Path(__file__).resolve().parent.parent.parent.parent
+        / "voicescribe-quota-manager"
+        / "config"
+        / "quota.yml"
+    )
+    if quota_yml.exists():
+        with open(quota_yml, encoding="utf-8") as f:
+            cfg = yaml.safe_load(f) or {}
+        return int(cfg.get("quota", {}).get("daily_limit", 2))
+    return 2  # fallback matches current default
 
 
 @pytest.fixture(scope="session")

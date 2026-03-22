@@ -35,6 +35,7 @@ async def test_free_tier_full_flow(
     base_url: str,
     verify_ssl: bool,
     test_audio_path: Path,
+    free_tier_quota_limit: int,
 ):
     """
     Free Tier: login, upload 2 min, poll DONE, download TXT/SRT, 403 su DOCX.
@@ -92,29 +93,34 @@ async def test_free_tier_full_flow(
         docx_resp = await client.get(f"{base_url}/v1/jobs/{job_id}/download/docx", headers=headers)
         assert docx_resp.status_code == 403
 
-        # 6. Second upload - should complete
-        with open(test_audio_path, "rb") as f:
-            upload2 = await client.post(
-                f"{base_url}/v1/transcribe",
-                headers=headers,
-                files={"file": ("audio2.mp3", f, "audio/mpeg")},
+        # 6. Consume remaining quota slots (daily_limit - 1 more uploads after the first)
+        for i in range(2, free_tier_quota_limit + 1):
+            with open(test_audio_path, "rb") as f:
+                extra_upload = await client.post(
+                    f"{base_url}/v1/transcribe",
+                    headers=headers,
+                    files={"file": (f"audio{i}.mp3", f, "audio/mpeg")},
+                )
+            assert extra_upload.status_code == 202, (
+                f"Upload {i}/{free_tier_quota_limit} failed: {extra_upload.text}"
             )
-        assert upload2.status_code == 202
-        job_id2 = upload2.json().get("job_id")
-        for _ in range(300):
-            r = await client.get(f"{base_url}/v1/jobs/{job_id2}", headers=headers)
-            if r.status_code == 200 and r.json().get("status") == "DONE":
-                break
-            await asyncio.sleep(2)
-        else:
-            pytest.fail("Second job did not complete")
+            extra_job_id = extra_upload.json().get("job_id")
+            for _ in range(300):
+                r = await client.get(f"{base_url}/v1/jobs/{extra_job_id}", headers=headers)
+                if r.status_code == 200 and r.json().get("status") == "DONE":
+                    break
+                await asyncio.sleep(2)
+            else:
+                pytest.fail(f"Upload {i} job did not complete")
 
-        # 7. Third upload - must return 429 (quota exceeded)
+        # 7. One more upload - must return 429 (quota exceeded)
         with open(test_audio_path, "rb") as f:
-            upload3 = await client.post(
+            over_quota = await client.post(
                 f"{base_url}/v1/transcribe",
                 headers=headers,
-                files={"file": ("audio3.mp3", f, "audio/mpeg")},
+                files={"file": ("audio_over_quota.mp3", f, "audio/mpeg")},
             )
-        assert upload3.status_code == 429
-        assert "Retry-After" in upload3.headers or "retry-after" in str(upload3.headers).lower()
+        assert over_quota.status_code == 429, (
+            f"Expected 429 after {free_tier_quota_limit} uploads, got {over_quota.status_code}"
+        )
+        assert "Retry-After" in over_quota.headers or "retry-after" in str(over_quota.headers).lower()
