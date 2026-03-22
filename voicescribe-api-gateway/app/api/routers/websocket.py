@@ -18,11 +18,22 @@ ws_router = APIRouter()
 
 
 async def _get_tenant_from_ws(websocket: WebSocket) -> str | None:
-    """Extract tenant from query params or headers. For now we accept token in query for WS."""
-    # In production, use Sec-WebSocket-Protocol or first message with auth
+    """
+    Extract and verify tenant from JWT token in query string.
+    Clients must pass ?token=<access_jwt>.
+    Returns tenant_id on success, None if token is missing or invalid.
+    """
     query = websocket.scope.get("query_string", b"").decode()
     params = dict(p.split("=", 1) for p in query.split("&") if "=" in p)
-    return params.get("tenant_id")
+    token = params.get("token")
+    if not token:
+        return None
+    try:
+        from app.core.security import decode_access_token
+        payload = decode_access_token(token)
+        return payload.get("tenant_id")
+    except Exception:
+        return None
 
 
 @ws_router.websocket("/ws/jobs/{job_id}")
